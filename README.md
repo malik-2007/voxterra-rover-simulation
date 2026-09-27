@@ -10,10 +10,25 @@ This repository contains the complete simulation prototypes, 3D sensor fusion HU
 
 
 
-1. Production Control Platform (voxterra-mine-rescue.onrender.com)The centralized web portal for real-time mine operations and emergency response management:Interactive 20×20 Mine Safety Map: Sector-based thermal sweeps, hazard mapping (Safe, Elevated Gas, Critical, Gas Source), and trapped survivor tracking.15-Stage Analysis Pipeline: MATLAB-inspired analytical workflow computing AI risk intelligence and automated decision support scores.Temporal Trend Analysis: Multi-visit gas concentration comparisons (Visit 1 vs Visit 2) for predictive threat modeling.Operations & Audit Logging: Priority alert dispatches and immutable mission event logging for active field units.
-2. 3D Rover Sensor Fusion & Telemetry (voxterra-rover-simulation.html)An interactive, browser-based 3D HUD interface simulating on-rover perception systems:3D LiDAR Tunnel Point Cloud: Real-time WebGL/Three.js rendering of curved underground mine geometry using dynamic color spectrums.Multi-Camera Stream Overlay: Front RGB optical stream, LWIR thermal infrared feed, and top-down LiDAR point-cloud viewports.Environmental & IMU Gauges: Live telemetry monitoring for CH_4, CO, O_2, H_2S, ambient temperature, flood depth, and 3-axis IMU orientation (Pitch, Roll, Yaw).
-3. Multi-Rover Mesh Relay Network (voxterra-mesh-sim.html)A dynamic 2D graph simulation demonstrating ad-hoc, hop-by-hop wireless mesh networking inside mine shafts:Autonomous Routing: Calculates communication range radiuses (R_{COMM} = 150Px) between active field rovers (R1–R4) and the Surface Gateway (GW) using Breadth-First Search (BFS) graph traversal.Dynamic Fault Tolerance: Interactive rockfall simulation disables intermediate relay nodes (e.g., R2), prompting roaming bridge units ($R5$) to automatically bridge broken links and prevent stale-data dropouts.
-4. 📁 Repository Structure
+
+1. Production Control Platform (voxterra-mine-rescue.onrender.com)
+   The centralized web portal for real-time mine operations and emergency response management:Interactive 20×20 Mine Safety Map: Sector-based thermal sweeps, hazard mapping (Safe, Elevated Gas, Critical, Gas Source), and trapped survivor tracking.
+   15-Stage Analysis Pipeline: MATLAB-inspired analytical workflow computing AI risk intelligence and automated decision support scores.
+   Temporal Trend Analysis: Multi-visit gas concentration comparisons (Visit 1 vs Visit 2) for predictive threat modeling.Operations & Audit Logging: Priority alert dispatches and immutable mission event logging for active field units.
+   
+3. 3D Rover Sensor Fusion & Telemetry (voxterra-rover-simulation.html)
+   An interactive, browser-based 3D HUD interface simulating on-rover perception systems:3D LiDAR Tunnel Point Cloud: Real-time WebGL/Three.js rendering of curved underground mine geometry using dynamic color spectrums.
+   Multi-Camera Stream Overlay: Front RGB optical stream, LWIR thermal infrared feed, and top-down LiDAR point-cloud viewports.
+     Environmental & IMU Gauges: Live telemetry monitoring for CH_4, CO, O_2, H_2S, ambient temperature, flood depth, and 3-axis IMU orientation (Pitch, Roll, Yaw).
+
+
+   
+5. Multi-Rover Mesh Relay Network (voxterra-mesh-sim.html)
+   A dynamic 2D graph simulation demonstrating ad-hoc, hop-by-hop wireless mesh networking inside mine shafts:Autonomous Routing: Calculates communication range radiuses (R_{COMM} = 150Px) between active field rovers (R1–R4) and the Surface Gateway (GW) using Breadth-First Search (BFS) graph traversal.Dynamic Fault Tolerance: Interactive rockfall simulation disables intermediate relay nodes (e.g., R2), prompting roaming bridge units ($R5$) to automatically bridge broken links and prevent stale-data dropouts.
+
+
+   
+7. 📁 Repository Structure
 Plaintext
 ├── voxterra-rover-simulation.html  # 3D WebGL HUD, LiDAR point cloud & multi-sensor simulation
 ├── voxterra-mesh-sim.html          # 2D Canvas-based dynamic mesh relay simulation & routing
