@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIH 2026 FINALE ROVER SIMULATION</title>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Window Bar */
+        .window-header {
+            background: #111;
+            padding: 6px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #222;
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: #ccc;
+        }
+        .window-title {
+            text-align: center;
+            flex-grow: 1;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 1.5px;
+        }
+        .window-controls span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-left: 6px;
+            border: 1px solid #555;
+        }
+
+        /* Main Grid Layout */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 1fr 140px;
+            gap: 6px;
+            padding: 6px;
+            height: calc(100vh - 30px);
+            background-color: #080808;
+        }
+
+        /* HUD Panels Common Styling */
+        .panel {
+            background: rgba(18, 18, 20, 0.85);
+            border: 1px solid #2a2a2e;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            background: #18181c;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #aaa;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #28282c;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Left Side Dashboard Panels */
+        .side-bar {
+            grid-row: 1 / 2;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Gas Monitor Gauges */
+        .gas-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            border-bottom: 1px solid #1a1a1e;
+        }
+        .gas-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .gas-label { font-size: 11px; color: #888; }
+        .gas-name { font-size: 12px; font-weight: bold; color: #eee; }
+        .gauge-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 3px solid #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-size: 11px;
+            font-weight: bold;
+            position: relative;
+        }
+        .gauge-value { font-size: 11px; }
+        .gauge-unit { font-size: 8px; color: #888; }
+
+        /* Environmental Status */
+        .env-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+        }
+        .metric-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .metric-value { font-weight: bold; color: #00e5ff; }
+
+        /* IMU Gauges */
+        .imu-container {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 4px;
+        }
+        .imu-dial {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            border: 2px solid #00e5ff;
+            background: #0d0d10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 8px rgba(0,229,255,0.15);
+        }
+        .imu-title { font-size: 9px; color: #888; margin-bottom: 2px; }
+        .imu-val { font-size: 11px; font-weight: bold; color: #fff; }
+
+        /* 3D Simulation Viewport */
+        .viewport-panel {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+            position: relative;
+            background: #000;
+        }
+        #sim-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Overlay Panels on 3D Viewport */
+        .overlay-box {
+            position: absolute;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        /* Top Left Feed (RGB) */
+        .feed-top-left {
+            top: 12px;
+            left: 12px;
+            width: 200px;
+            height: 130px;
+        }
+        /* Top Right Feed (Thermal) */
+        .feed-top-right {
+            top: 12px;
+            right: 12px;
+            width: 220px;
+            height: 140px;
+            border: 1px solid rgba(0, 229, 255, 0.3);
+        }
+        .feed-title {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            font-size: 9px;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 5px;
+            border-radius: 2px;
+            color: #00e5ff;
+        }
+
+        /* Hazard Warning Popup */
+        .hazard-banner {
+            position: absolute;
+            top: 45%;
+            right: 18%;
+            background: rgba(40, 15, 0, 0.85);
+            border: 1px solid #ff6600;
+            padding: 10px 16px;
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(255,102,0,0.4);
+            animation: pulse-border 1.5s infinite alternate;
+        }
+        .hazard-title { font-size: 11px; color: #ffaa00; font-weight: bold; }
+        .hazard-desc { font-size: 13px; color: #ffffff; font-weight: bold; margin-top: 2px; }
+
+        @keyframes pulse-border {
+            0% { border-color: #ff6600; box-shadow: 0 0 5px rgba(255,102,0,0.3); }
+            100% { border-color: #ff0000; box-shadow: 0 0 18px rgba(255,0,0,0.6); }
+        }
+
+        /* Bottom Status Row Panels */
+        .bottom-row {
+            grid-column: 1 / 3;
+            grid-row: 2 / 3;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .camera-feed-sim {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
+        }
+
+        .hud-watermark {
+            position: absolute;
+            bottom: 12px;
+            right: 16px;
+            font-size: 26px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.25);
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Window Frame -->
+    <div class="window-header">
+        <div>SIH 2026 FINALE ROVER SIMULATION</div>
+        <div class="window-title">VOXTERRA UNDERGROUND MINE NAVIGATION</div>
+        <button id="btn-emergency" style="background:#7a1c00; color:#fff; border:1px solid #ff6600; border-radius:3px; padding:4px 10px; font-size:11px; font-weight:bold; letter-spacing:0.5px; cursor:pointer;">⚠ TRIGGER EMERGENCY</button>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="dashboard-container">
+
+        <!-- Left Dashboard Columns -->
+        <div class="side-bar">
+            <!-- Gas Concentrations Panel -->
+            <div class="panel" style="flex: 2;">
+                <div class="panel-header">GAS CONCENTRATION MONITOR <span>✕</span></div>
+
+                <div class="gas-item">
+                    <div class="gas-info">
+                        <span class="gas-name">CH4, Methane</span>
+                        <span class="gas-label">Explosive Threshold</span>
+                    </div>
+                    <div class="gauge-circle" style="border-color: #ff3300; color: #ff3300;">
+                        <span class="gauge-value" id="val-ch4">1.5</span>
+                        <span class="gauge-unit">%</span>
+                    </div>
+                </div>
+
+                <div class="gas-item">
+                    <div class="gas-info">
+                        <span class="gas-name">CO, Carbon Monoxide</span>
+                        <span class="gas-label">Toxic Limit</span>
+                    </div>
+                    <div class="gauge-circle" style="border-color: #ff9900; color: #ff9900;">
+                        <span class="gauge-value" id="val-co">20</span>
+                        <span class="gauge-unit">ppm</span>
+                    </div>
+                </div>
+
+                <div class="gas-item">
+                    <div class="gas-info">
+                        <span class="gas-name">O2, Oxygen</span>
+                        <span class="gas-label">Normal Level</span>
+                    </div>
+                    <div class="gauge-circle" style="border-color: #00e5ff; color: #00e5ff;">
+                        <span class="gauge-value" id="val-o2">19.8</span>
+                        <span class="gauge-unit">%</span>
+                    </div>
+                </div>
+
+                <div class="gas-item">
+                    <div class="gas-info">
+                        <span class="gas-name">H2S, Hydrogen Sulfide</span>
+                        <span class="gas-label">Trace Level</span>
+                    </div>
+                    <div class="gauge-circle" style="border-color: #00ff66; color: #00ff66;">
+                        <span class="gauge-value">0.1</span>
+                        <span class="gauge-unit">ppm</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environmental Status -->
+            <div class="panel" style="flex: 1;">
+                <div class="panel-header">ENVIRONMENTAL STATUS <span>✕</span></div>
+                <div class="env-metrics">
+                    <div class="metric-row">
+                        <span>Ambient Temp:</span>
+                        <span class="metric-value" id="val-temp">24.5 °C</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Water Level Depth:</span>
+                        <span class="metric-value" id="val-water">15.0 cm</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Tunnel Flooding:</span>
+                        <span class="metric-value" style="color: #ffaa00;">MODERATE</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMU Orientation Gauges -->
+            <div class="panel" style="flex: 1.2;">
+                <div class="panel-header">IMU ORIENTATION <span>✕</span></div>
+                <div class="imu-container">
+                    <div class="imu-dial">
+                        <span class="imu-title">Pitch</span>
+                        <span class="imu-val" id="val-pitch">+3°</span>
+                    </div>
+                    <div class="imu-dial">
+                        <span class="imu-title">Roll</span>
+                        <span class="imu-val" id="val-roll">-1°</span>
+                    </div>
+                    <div class="imu-dial">
+                        <span class="imu-title">Yaw</span>
+                        <span class="imu-val" id="val-yaw">210°</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Central 3D Viewport -->
+        <div class="viewport-panel panel">
+            <canvas id="sim-canvas"></canvas>
+
+            <!-- Overlay: Optical Feed -->
+            <div class="overlay-box feed-top-left">
+                <span class="feed-title">RGB Camera Feed (Front)</span>
+                <canvas id="optics-canvas" width="200" height="130"></canvas>
+            </div>
+
+            <!-- Overlay: Thermal Infrared Feed -->
+            <div class="overlay-box feed-top-right">
+                <span class="feed-title">LWIR Thermal Feed (24.5°C)</span>
+                <canvas id="thermal-canvas" width="220" height="140"></canvas>
+            </div>
+
+            <!-- Hazard Warning Callout -->
+            <div class="hazard-banner" id="hazard-banner" style="display:none;">
+                <div class="hazard-title" id="hazard-title">HAZARD DETECTION:</div>
+                <div class="hazard-desc" id="hazard-desc">Gas anomaly CH4 high</div>
+            </div>
+
+            <div class="hud-watermark">8x</div>
+        </div>
+
+        <!-- Bottom Camera & Data Feeds -->
+        <div class="bottom-row">
+            <div class="panel">
+                <div class="panel-header">RGB Imagery (Camera 1) — Live</div>
+                <canvas id="b-rgb" style="width:100%; height:100%;"></canvas>
+            </div>
+            <div class="panel">
+                <div class="panel-header">Thermal Imagery (Infrared) — Live</div>
+                <canvas id="b-thermal" style="width:100%; height:100%;"></canvas>
+            </div>
+            <div class="panel">
+                <div class="panel-header">LiDAR Point Cloud (Raw) — Live</div>
+                <canvas id="b-lidar" style="width:100%; height:100%;"></canvas>
+            </div>
+            <div class="panel">
+                <div class="panel-header">Data Log</div>
+                <div id="data-log" style="font-family: monospace; font-size: 10px; color: #00ff66; padding: 6px; overflow-y: hidden; line-height: 1.4;">
+                    > [SYS] Telemetry Pipeline Connected.<br>
+                    > [IMU] Quaternion Lock OK.<br>
+                    > [LIDAR] Point Cloud Stream: 120,000 pts/s.<br>
+                    > [WARN] CH4 Spike Detected at Waypoint 14!
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 3D Simulation Logic -->
+    <script>
+        // --- 1. THREE.JS SCENE SETUP ---
+        const container = document.querySelector('.viewport-panel');
+        const canvas = document.getElementById('sim-canvas');
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // --- 2. GENERATE CURVED UNDERGROUND TUNNEL POINT CLOUD ---
+        const tunnelPoints = [];
+        const tunnelColors = [];
+        const lengthSegments = 200;
+        const radialSegments = 32;
+        const radius = 4.5;
+
+        // Color Spectrum (Rainbow Gradient for LiDAR height/distance)
+        function getLiDARColor(t) {
+            const color = new THREE.Color();
+            color.setHSL((1.0 - t) * 0.7, 1.0, 0.5); // HSL gradient from purple to blue to green to red
+            return color;
+        }
+
+        // Generate curved tunnel path geometry
+        for (let i = 0; i < lengthSegments; i++) {
+            const progress = i / lengthSegments;
+            const z = -i * 1.2;
+            const x = Math.sin(i * 0.08) * 6.0; // S-Curve tunnel bend
+            const y = Math.cos(i * 0.05) * 1.5;
+
+            const baseColor = getLiDARColor(progress);
+
+            for (let j = 0; j < radialSegments; j++) {
+                const angle = (j / radialSegments) * Math.PI * 2;
+                // Add noise for rough rocky mine tunnel texturing
+                const noise = (Math.random() - 0.5) * 0.35;
+                const px = x + (radius + noise) * Math.cos(angle);
+                const py = y + (radius + noise) * Math.sin(angle);
+                const pz = z;
+
+                tunnelPoints.push(px, py, pz);
+                tunnelColors.push(baseColor.r, baseColor.g, baseColor.b);
+            }
+        }
+
+        const pointGeometry = new THREE.BufferGeometry();
+        pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute(tunnelPoints, 3));
+        pointGeometry.setAttribute('color', new THREE.Float32BufferAttribute(tunnelColors, 3));
+
+        const pointMaterial = new THREE.PointsMaterial({
+            size: 0.18,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.85
+        });
+
+        const tunnelCloud = new THREE.Points(pointGeometry, pointMaterial);
+        scene.add(tunnelCloud);
+
+        // --- 3. TRAJECTORY WAYPOINTS (GREEN GRID) ---
+        const waypoints = [];
+        const waypointCount = 35;
+        for (let i = 0; i < waypointCount; i++) {
+            const z = -i * 2.5;
+            const x = Math.sin(i * 0.08 * (2.5/1.2)) * 6.0;
+            const y = Math.cos(i * 0.05 * (2.5/1.2)) * 1.5 - 2.8;
+            waypoints.push(new THREE.Vector3(x, y, z));
+        }
+
+        // Draw Waypoint Grid Wireframe Path
+        const gridGeometry = new THREE.BufferGeometry();
+        const gridPositions = [];
+
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            // Main Path Line
+            gridPositions.push(waypoints[i].x, waypoints[i].y, waypoints[i].z);
+            gridPositions.push(waypoints[i+1].x, waypoints[i+1].y, waypoints[i+1].z);
+
+            // Cross-grid Trajectory Lines
+            gridPositions.push(waypoints[i].x - 1.2, waypoints[i].y, waypoints[i].z);
+            gridPositions.push(waypoints[i].x + 1.2, waypoints[i].y, waypoints[i].z);
+        }
+
+        gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPositions, 3));
+        const gridMaterial = new THREE.LineBasicMaterial({ color: 0x00ff66, linewidth: 2 });
+        const trajectoryGrid = new THREE.LineSegments(gridGeometry, gridMaterial);
+        scene.add(trajectoryGrid);
+
+        // Add Waypoint Spheres
+        const sphereGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+        waypoints.forEach(pt => {
+            const sp = new THREE.Mesh(sphereGeo, sphereMat);
+            sp.position.copy(pt);
+            scene.add(sp);
+        });
+
+        // --- 3b. RGB CAMERA FEED (separate scene, muted rock-tunnel tones vs. rainbow LiDAR) ---
+        const rgbScene = new THREE.Scene();
+        rgbScene.fog = new THREE.FogExp2(0x161410, 0.05);
+        rgbScene.background = new THREE.Color(0x0c0a08);
+
+        const rgbTunnelMat = new THREE.PointsMaterial({ color: 0x8a7a63, size: 0.22, transparent: true, opacity: 0.9 });
+        const rgbTunnelCloud = new THREE.Points(pointGeometry, rgbTunnelMat); // reuses tunnel geometry, muted material
+        rgbScene.add(rgbTunnelCloud);
+
+        const rgbLight = new THREE.PointLight(0xffe0b0, 1.2, 12);
+        rgbScene.add(rgbLight);
+
+        const rgbCamera = new THREE.PerspectiveCamera(70, 200 / 130, 0.1, 60);
+
+        const opticsCanvasEl = document.getElementById('optics-canvas');
+        const rgbRenderer = new THREE.WebGLRenderer({ canvas: opticsCanvasEl, antialias: true });
+        rgbRenderer.setSize(200, 130);
+
+        const bRgbCanvas = document.getElementById('b-rgb');
+        bRgbCanvas.width = 320; bRgbCanvas.height = 160;
+        const bRgbCtx = bRgbCanvas.getContext('2d');
+
+        // --- 3c. LIDAR RAW POINT CLOUD FEED (top-down scan view, live) ---
+        const bLidarCanvas = document.getElementById('b-lidar');
+        bLidarCanvas.width = 320; bLidarCanvas.height = 160;
+        const lidarRenderer = new THREE.WebGLRenderer({ canvas: bLidarCanvas, antialias: true });
+        lidarRenderer.setSize(320, 160);
+        const lidarCamera = new THREE.PerspectiveCamera(55, 320 / 160, 0.1, 60);
+
+        // --- 4. ROVER CHASSIS MESH ---
+        const roverGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(1.2, 0.6, 1.8);
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
+        const roverBody = new THREE.Mesh(bodyGeo, bodyMat);
+        roverGroup.add(roverBody);
+        scene.add(roverGroup);
+
+        // --- 5. EMERGENCY STATE MACHINE ---
+        let emergencyActive = false;
+        let emergencyStart = 0;
+        const logEl = document.getElementById('data-log');
+        const hazardBanner = document.getElementById('hazard-banner');
+        const hazardDesc = document.getElementById('hazard-desc');
+        const btnEmergency = document.getElementById('btn-emergency');
+
+        function logLine(text) {
+            logEl.innerHTML += '<br>&gt; ' + text;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        btnEmergency.addEventListener('click', () => {
+            emergencyActive = !emergencyActive;
+            if (emergencyActive) {
+                emergencyStart = performance.now();
+                btnEmergency.textContent = '✅ RESET TO NORMAL';
+                btnEmergency.style.background = '#1a4d1a';
+                btnEmergency.style.borderColor = '#00ff66';
+                hazardBanner.style.display = 'block';
+                hazardDesc.textContent = 'CH4 82% LEL — Human thermal signature detected';
+                logLine('[ALERT] Rapid CH4 rise detected — 82% Lower Explosive Limit');
+                logLine('[THERMAL] Human-shaped heat signature identified ahead');
+                logLine('[AI] Rescue Confidence Score: 94% — likely trapped worker');
+                logLine('[NAV] Rerouting rescue team away from hazard zone');
+            } else {
+                btnEmergency.textContent = '⚠ TRIGGER EMERGENCY';
+                btnEmergency.style.background = '#7a1c00';
+                btnEmergency.style.borderColor = '#ff6600';
+                hazardBanner.style.display = 'none';
+                logLine('[SYS] Emergency cleared — telemetry nominal');
+            }
+        });
+
+        // --- 6. ANIMATION LOOP & TELEMETRY UPDATES ---
+        let step = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            step += 0.06;
+            const progressIndex = Math.floor(step % (waypoints.length - 5));
+            const currentPt = waypoints[progressIndex];
+            const nextPt = waypoints[progressIndex + 1];
+
+            // Update Rover Position
+            if (currentPt && nextPt) {
+                roverGroup.position.lerpVectors(currentPt, nextPt, (step % 1));
+                roverGroup.lookAt(nextPt);
+
+                // Dynamic Third-Person Camera Following
+                camera.position.x = roverGroup.position.x + Math.sin(step * 0.05) * 1.5;
+                camera.position.y = roverGroup.position.y + 3.2;
+                camera.position.z = roverGroup.position.z + 8.0;
+                camera.lookAt(roverGroup.position.x, roverGroup.position.y, roverGroup.position.z - 5.0);
+
+                // Forward-facing RGB camera mounted on the rover's nose
+                rgbCamera.position.copy(roverGroup.position).add(new THREE.Vector3(0, 0.35, -0.6));
+                rgbCamera.lookAt(nextPt.x, nextPt.y, nextPt.z);
+                rgbLight.position.copy(rgbCamera.position);
+                rgbLight.color.set(emergencyActive ? 0xff5533 : 0xffe0b0);
+                rgbRenderer.render(rgbScene, rgbCamera);
+                bRgbCtx.drawImage(opticsCanvasEl, 0, 0, bRgbCanvas.width, bRgbCanvas.height);
+
+                // Top-down LiDAR raw scan view, following the rover from above
+                lidarCamera.position.set(roverGroup.position.x, roverGroup.position.y + 9, roverGroup.position.z + 1.5);
+                lidarCamera.lookAt(roverGroup.position.x, roverGroup.position.y, roverGroup.position.z);
+                lidarRenderer.render(scene, lidarCamera);
+            }
+
+            // Real-Time Dynamic Dashboard Value Fluctuations (overridden during emergency)
+            const ch4 = emergencyActive ? Math.min(4.8, 1.6 + (performance.now() - emergencyStart) / 1500) : (1.4 + Math.sin(step * 0.1) * 0.2);
+            const co = emergencyActive ? Math.floor(140 + Math.sin(step * 0.6) * 15) : Math.floor(19 + Math.sin(step * 0.2) * 3);
+            document.getElementById('val-ch4').innerText = ch4.toFixed(1);
+            document.getElementById('val-co').innerText = co;
+            document.getElementById('val-pitch').innerText = (3 + Math.sin(step * 0.3) * 2).toFixed(0) + '°';
+            document.getElementById('val-roll').innerText = (-1 + Math.cos(step * 0.3) * 1.5).toFixed(0) + '°';
+            document.getElementById('val-yaw').innerText = Math.floor(205 + (step * 0.5) % 20) + '°';
+
+            // CH4 gauge flashes red past danger threshold
+            const ch4Gauge = document.getElementById('val-ch4').closest('.gauge-circle');
+            if (ch4Gauge) ch4Gauge.style.borderColor = ch4 > 4.0 ? (Math.sin(step * 3) > 0 ? '#ff0000' : '#661100') : '#ff3300';
+
+            renderer.render(scene, camera);
+            renderCanvasFeeds(step);
+        }
+
+        // --- 7. REALISTIC INFRARED THERMAL RENDERER (Ironbow palette) ---
+        function ironbow(t) {
+            // t: 0 (cold) -> 1 (hot). Approximates a FLIR-style ironbow LUT.
+            const stops = [
+                [0, 0, 0, 20], [0.25, 60, 0, 90], [0.5, 200, 30, 20],
+                [0.75, 255, 150, 0], [1, 255, 255, 220]
+            ];
+            for (let i = 0; i < stops.length - 1; i++) {
+                const [t0, r0, g0, b0] = stops[i], [t1, r1, g1, b1] = stops[i + 1];
+                if (t >= t0 && t <= t1) {
+                    const f = (t - t0) / (t1 - t0);
+                    return `rgb(${Math.round(r0 + (r1 - r0) * f)},${Math.round(g0 + (g1 - g0) * f)},${Math.round(b0 + (b1 - b0) * f)})`;
+                }
+            }
+            return 'rgb(255,255,220)';
+        }
+
+        const thCanvas = document.getElementById('thermal-canvas');
+        const ctx2 = thCanvas.getContext('2d');
+        const bThermalCanvas = document.getElementById('b-thermal');
+        bThermalCanvas.width = 320; bThermalCanvas.height = 160;
+        const bThCtx = bThermalCanvas.getContext('2d');
+
+        function renderCanvasFeeds(step) {
+            const W = 220, H = 140;
+            // Base ambient rock temperature field (coarse blocky noise, like real sensor cells)
+            const cell = 8;
+            for (let x = 0; x < W; x += cell) {
+                for (let y = 0; y < H; y += cell) {
+                    const ambient = 0.12 + 0.05 * Math.sin(x * 0.05 + step) * Math.cos(y * 0.07 - step * 0.5) + (Math.random() - 0.5) * 0.06;
+                    ctx2.fillStyle = ironbow(Math.max(0, Math.min(1, ambient)));
+                    ctx2.fillRect(x, y, cell, cell);
+                }
+            }
+            // Rover's own drivetrain heat (drifting glow, bottom-left)
+            drawHeatBlob(ctx2, 60 + Math.sin(step * 0.4) * 10, 110, 26, 0.55);
+
+            if (emergencyActive) {
+                // Human-shaped heat signature: head + torso, pulsing like breathing
+                const bx = 140 + Math.sin(step * 0.2) * 6, by = 70;
+                const pulse = 0.9 + Math.sin(step * 4) * 0.08;
+                drawHeatBlob(ctx2, bx, by - 22, 12 * pulse, 0.95);   // head
+                drawHeatBlob(ctx2, bx, by + 6, 20 * pulse, 0.85);    // torso
+            }
+
+            ctx2.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx2.strokeRect(0, 0, W, H);
+
+            bThCtx.drawImage(thCanvas, 0, 0, bThermalCanvas.width, bThermalCanvas.height);
+        }
+
+        function drawHeatBlob(ctx, cx, cy, r, intensity) {
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            grad.addColorStop(0, ironbow(intensity));
+            grad.addColorStop(0.5, ironbow(intensity * 0.6));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Resize Listener
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // Run Simulation
+        animate();
+    </script>
+</body>
+</html>

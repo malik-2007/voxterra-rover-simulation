@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VoxTerra Mesh Relay Simulation</title>
+<style>
+:root{--bg:#0e1116;--panel:#161b22;--text:#e6edf3;--muted:#8b949e;--accent:#4dd0c8;--line:#30363d;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:18px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.wrap{max-width:1000px;margin:0 auto;padding:20px}
+.grid{display:flex;gap:16px;flex-wrap:wrap}
+.mapcard{flex:2;min-width:320px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+canvas{width:100%;height:auto;display:block;border-radius:8px;background:#0a0d12}
+.panel{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px}
+.rover-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.rover-row:last-child{border-bottom:none}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-ok{color:#3fb950}
+.status-bad{color:#f85149}
+.controls{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+button{background:var(--accent);color:#04231f;border:none;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;font-size:13px}
+button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:0.5;cursor:not-allowed}
+input[type=range]{width:100px}
+.legend{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+.log{margin-top:10px;font-size:12px;color:var(--muted);min-height:34px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🛰️ VoxTerra — Rover Mesh Relay Simulation</h1>
+<p class="sub">Rovers patrol the tunnel and relay hazard data hop-by-hop back to the surface gateway. A roaming rover (R5) drifts the full tunnel and can bridge a broken link. Trigger a rockfall to see the mesh react.</p>
+<div class="grid">
+<div class="mapcard">
+<canvas id="cv" width="700" height="500"></canvas>
+<div class="controls">
+<button id="play">Pause</button>
+<button class="secondary" id="reset">Reset</button>
+<label style="font-size:12px;color:var(--muted)">Speed <input type="range" id="speed" min="0.5" max="3" step="0.5" value="1"></label>
+<button id="rockfall">⚠️ Simulate Rockfall</button>
+</div>
+<div class="log" id="log"></div>
+</div>
+<div class="panel">
+<h2>Rover Status</h2>
+<div id="status"></div>
+<div class="legend">
+🟩 solid line = active relay path &nbsp;·&nbsp; ┄ dashed = in range, unused<br>
+🔴 red X = rover disabled (rockfall)<br>
+Gas reading freezes ("stale") when a rover loses its relay path.
+</div>
+</div>
+</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const pts=[{x:350,y:30},{x:350,y:110},{x:250,y:170},{x:250,y:250},{x:380,y:300},{x:380,y:380},{x:250,y:430}];
+let cum=[0];for(let i=1;i<pts.length;i++){const dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;cum.push(cum[i-1]+Math.hypot(dx,dy));}
+const total=cum[cum.length-1];
+function pointAtT(t){t=Math.max(0,Math.min(1,t));const target=t*total;
+for(let i=1;i<cum.length;i++){if(target<=cum[i]){const segT=(target-cum[i-1])/(cum[i]-cum[i-1]||1);
+return{x:pts[i-1].x+(pts[i].x-pts[i-1].x)*segT,y:pts[i-1].y+(pts[i].y-pts[i-1].y)*segT};}}
+return pts[pts.length-1];}
+
+const R_COMM=150;
+const rovers=[
+{id:'R4',label:'R4',center:0.22,range:0.05,speed:0.6,phase:0,color:'#4dd0c8'},
+{id:'R3',label:'R3',center:0.42,range:0.05,speed:0.5,phase:1.5,color:'#8b7cf6'},
+{id:'R2',label:'R2',center:0.62,range:0.05,speed:0.55,phase:3.0,color:'#f28b6b'},
+{id:'R1',label:'R1',center:0.82,range:0.05,speed:0.45,phase:4.5,color:'#e06b9e'},
+{id:'R5',label:'R5',center:0.5,range:0.44,speed:0.15,phase:0,color:'#f4c542',roamer:true}
+];
+rovers.forEach(r=>{r.disabled=false;r.gas=20+Math.random()*10;r.lastGood=r.gas;r.lastGoodT=0;});
+
+let simTime=0,playing=true,speedMul=1,rockfallBtnLock=false;
+const logEl=document.getElementById('log'),statusEl=document.getElementById('status'),playBtn=document.getElementById('play');
+
+function positionsAt(t){return rovers.map(r=>{
+  const rt=Math.max(0,Math.min(1,r.center+r.range*Math.sin(r.speed*t+r.phase)));
+  return{...r,pos:pointAtT(rt),t:rt};
+});}
+
+function computeMesh(list){
+  const gw={id:'GW',pos:pts[0]};
+  const active=list.filter(r=>!r.disabled);
+  const nodes=[gw,...active];
+  const dist=(a,b)=>Math.hypot(a.pos.x-b.pos.x,a.pos.y-b.pos.y);
+  const adj=nodes.map(()=>[]);
+  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+    if(dist(nodes[i],nodes[j])<=R_COMM){adj[i].push(j);adj[j].push(i);}
+  }
+  const parent=new Array(nodes.length).fill(-1),visited=new Array(nodes.length).fill(false),hops=new Array(nodes.length).fill(-1);
+  const q=[0];visited[0]=true;hops[0]=0;
+  while(q.length){const u=q.shift();for(const v of adj[u]){if(!visited[v]){visited[v]=true;parent[v]=u;hops[v]=hops[u]+1;q.push(v);}}}
+  return{nodes,parent,visited,hops};
+}
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle='#2a3138';ctx.lineWidth=16;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();
+
+  // gateway
+  ctx.fillStyle='#e6edf3';ctx.fillRect(pts[0].x-12,pts[0].y-12,24,24);
+  ctx.fillStyle='#0e1116';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText('GW',pts[0].x,pts[0].y+4);
+  ctx.fillStyle='#8b949e';ctx.font='11px sans-serif';ctx.fillText('SURFACE GATEWAY',pts[0].x,pts[0].y-20);
+
+  const list=positionsAt(simTime);
+  const mesh=computeMesh(list);
+  const idx={GW:0};list.forEach((r,i)=>{if(!r.disabled)idx[r.id]=mesh.nodes.findIndex(n=>n.id===r.id);});
+
+  // range circles
+  list.forEach(r=>{if(r.disabled)return;ctx.beginPath();ctx.arc(r.pos.x,r.pos.y,R_COMM,0,7);ctx.fillStyle=r.color+'12';ctx.fill();});
+
+  // relay tree edges (green solid)
+  for(let i=1;i<mesh.nodes.length;i++){
+    if(mesh.visited[i]){const a=mesh.nodes[i],b=mesh.nodes[mesh.parent[i]];
+      ctx.beginPath();ctx.moveTo(a.pos.x,a.pos.y);ctx.lineTo(b.pos.x,b.pos.y);
+      ctx.strokeStyle='#3fb950';ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.stroke();}
+  }
+  // in-range unused edges (dashed gray)
+  for(let i=0;i<mesh.nodes.length;i++)for(let j=i+1;j<mesh.nodes.length;j++){
+    const a=mesh.nodes[i],b=mesh.nodes[j],d=Math.hypot(a.pos.x-b.pos.x,a.pos.y-b.pos.y);
+    if(d<=R_COMM && mesh.parent[j]!==i && mesh.parent[i]!==j){
+      ctx.beginPath();ctx.moveTo(a.pos.x,a.pos.y);ctx.lineTo(b.pos.x,b.pos.y);
+      ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+  }
+
+  // rovers
+  list.forEach(r=>{
+    ctx.beginPath();ctx.arc(r.pos.x,r.pos.y,13,0,7);
+    ctx.fillStyle=r.disabled?'#3a3f47':r.color;ctx.fill();
+    ctx.fillStyle='#0e1116';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(r.label,r.pos.x,r.pos.y+4);
+    if(r.disabled){ctx.strokeStyle='#f85149';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.moveTo(r.pos.x-9,r.pos.y-9);ctx.lineTo(r.pos.x+9,r.pos.y+9);
+      ctx.moveTo(r.pos.x+9,r.pos.y-9);ctx.lineTo(r.pos.x-9,r.pos.y+9);ctx.stroke();}
+  });
+
+  // status + gas update
+  let html='';
+  list.forEach(r=>{
+    const nodeIdx=mesh.nodes.findIndex(n=>n.id===r.id);
+    const connected=!r.disabled && nodeIdx>=0 && mesh.visited[nodeIdx];
+    if(connected && Math.floor(simTime*2)%2===0){r.gas+=(Math.random()-0.5)*2;r.gas=Math.max(5,Math.min(95,r.gas));r.lastGood=r.gas;r.lastGoodT=simTime;}
+    const hops=connected?mesh.hops[nodeIdx]:null;
+    const label=r.disabled?'<span class="status-bad">DISABLED (rockfall)</span>':
+      connected?`<span class="status-ok">Connected · ${hops} hop${hops===1?'':'s'}</span>`:
+      `<span class="status-bad">OFFLINE — no relay path</span>`;
+    const gasTxt=connected?`Gas ${r.lastGood.toFixed(0)} ppm`:`Gas ${r.lastGood.toFixed(0)} ppm (stale, ${(simTime-r.lastGoodT).toFixed(0)}s)`;
+    html+=`<div class="rover-row"><span><span class="dot" style="background:${r.color}"></span>${r.label} — ${gasTxt}</span><span>${label}</span></div>`;
+  });
+  statusEl.innerHTML=html;
+}
+
+let lastTs=null;
+function loop(ts){
+  if(lastTs===null)lastTs=ts;
+  const dt=(ts-lastTs)/1000;lastTs=ts;
+  if(playing)simTime+=dt*speedMul;
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById('play').onclick=()=>{playing=!playing;playBtn.textContent=playing?'Pause':'Play';};
+document.getElementById('speed').oninput=(e)=>{speedMul=parseFloat(e.target.value);};
+document.getElementById('reset').onclick=()=>{simTime=0;rovers.forEach(r=>{r.disabled=false;r.gas=20+Math.random()*10;r.lastGood=r.gas;r.lastGoodT=0;});logEl.textContent='';};
+document.getElementById('rockfall').onclick=function(){
+  if(rockfallBtnLock)return;rockfallBtnLock=true;this.disabled=true;
+  const target=rovers.find(r=>r.id==='R2');target.disabled=true;
+  logEl.textContent='⚠️ Rockfall simulated — R2 disabled. Watch downstream rovers and see if R5 bridges the gap.';
+  setTimeout(()=>{target.disabled=false;logEl.textContent='✅ R2 back online — mesh restored.';rockfallBtnLock=false;this.disabled=false;},7000);
+};
+</script>
+</body>
+</html>
