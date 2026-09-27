@@ -8,20 +8,6 @@ This repository contains the complete simulation prototypes, 3D sensor fusion HU
 
 ⚙️ Repository Source: Simulation and control nodes for VoxTerra scout rovers.
 
-🛠️ System Architecture & Components
-VoxTerra consists of three core components:
-
-                  ┌─────────────────────────────────────────┐
-                  │   VoxTerra Web Control Platform          │
-                  │   (voxterra-mine-rescue.onrender.com)   │
-                  └────────────────────┬────────────────────┘
-                                       │
-                ┌──────────────────────┴──────────────────────┐
-                │                                             │
-┌───────────────▼──────────────┐             ┌────────────────▼──────────────┐
-│  3D Rover Telemetry HUD      │             │  2D Rover Mesh Relay Network  │
-│  (voxterra-rover-simulation) │             │  (voxterra-mesh-sim)          │
-└──────────────────────────────┘             └───────────────────────────────┘
 
 
 1. Production Control Platform (voxterra-mine-rescue.onrender.com)The centralized web portal for real-time mine operations and emergency response management:Interactive 20×20 Mine Safety Map: Sector-based thermal sweeps, hazard mapping (Safe, Elevated Gas, Critical, Gas Source), and trapped survivor tracking.15-Stage Analysis Pipeline: MATLAB-inspired analytical workflow computing AI risk intelligence and automated decision support scores.Temporal Trend Analysis: Multi-visit gas concentration comparisons (Visit 1 vs Visit 2) for predictive threat modeling.Operations & Audit Logging: Priority alert dispatches and immutable mission event logging for active field units.
